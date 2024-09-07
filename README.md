@@ -1,32 +1,33 @@
 # nm-watcher
 
 Network monitor to restart network interface whenever it hangs. Built to avoind loosing access to headless Proxmox Virtual Serverevery time the network adapter stops responding.
+- Download nm-watcher file
 
-- Primero, crea un archivo de servicio en el directorio /etc/systemd/system/
+- Create a service file into /etc/systemd/system/
     ```
-  sudo nano /etc/systemd/system/network-monitor.service
+  sudo nano /etc/systemd/system/nm-watcher.service
     ```
-- Dentro del archivo, añade el siguiente contenido:
+- Put this into the new service file:
   ```
   [Unit]
   Description=Network Monitor Service
   After=network.target
 
   [Service]
-  ExecStart=/path/to/your/script.sh
+  ExecStart=/path/to/your/nm-watcher
   Restart=always
   User=root
 
   [Install]
   WantedBy=multi-user.target
     ```
-- Una vez que has creado y configurado el archivo del servicio, necesitas habilitarlo y arrancarlo:
+- Enable and start new service:
     ```
   sudo systemctl daemon-reload
   sudo systemctl enable network-monitor.service
   sudo systemctl start network-monitor.service
     ```
-- Puedes comprobar si el servicio está funcionando correctamente con:
+- Validate services is working ok:
     ```
   sudo systemctl status network-monitor.service
     ```
