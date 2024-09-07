@@ -1,0 +1,15 @@
+#!/bin/bash
+
+while true; do
+    # Verificar si la interfaz tiene una IP asignada
+    NET=$(ip addr show vmbr0 | grep "inet\b")
+    # Intentar hacer ping al gateway
+    ROUTE=$(ping -c 1 192.168.1.100 | grep "1 received")
+    
+    if [ -z "$NET" ] || [ -z "$ROUTE" ]; then
+        echo "Conexión caída. Reiniciando NetworkManager..."
+        systemctl restart networking
+    fi
+
+    sleep 5
+done
