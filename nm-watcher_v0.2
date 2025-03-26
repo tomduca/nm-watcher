@@ -1,0 +1,92 @@
+#!/bin/bash
+
+# Archivo de log para depuración
+LOG_FILE="/var/log/nm-watcher.log"
+
+# Gateway para probar la conectividad
+GATEWAY="192.168.1.100"
+
+# Interfaz física a monitorear
+INTERFACE="eno1"
+
+# Número de intentos de ping antes de considerar la conexión caída
+PING_RETRIES=3
+
+# Tiempo de espera entre verificaciones (en segundos)
+SLEEP_INTERVAL=5
+
+# Función para registrar mensajes en el log
+log_message() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE"
+}
+
+# Función para verificar si hay un bloqueo "Hardware Unit Hang"
+check_hardware_hang() {
+    dmesg | grep -i "e1000e.*Hardware Unit Hang" | tail -n 1
+}
+
+# Función para reiniciar la interfaz física
+restart_interface() {
+    log_message "Reiniciando la interfaz $INTERFACE..."
+    ip link set "$INTERFACE" down
+    sleep 1
+    ip link set "$INTERFACE" up
+    log_message "Interfaz $INTERFACE reiniciada."
+}
+
+# Función para recargar el módulo e1000e
+reload_module() {
+    log_message "Recargando el módulo e1000e..."
+    modprobe -r e1000e
+    sleep 1
+    modprobe e1000e
+    log_message "Módulo e1000e recargado."
+}
+
+# Bucle principal
+while true; do
+    # Verificar si la interfaz física está activa
+    LINK_STATUS=$(ethtool "$INTERFACE" | grep "Link detected: yes")
+    if [ -z "$LINK_STATUS" ]; then
+        log_message "No se detecta enlace en $INTERFACE."
+        restart_interface
+    fi
+
+    # Verificar si hay un bloqueo "Hardware Unit Hang"
+    HANG=$(check_hardware_hang)
+    if [ -n "$HANG" ]; then
+        log_message "Detectado Hardware Unit Hang: $HANG"
+        restart_interface
+        # Si el problema persiste, recargar el módulo (esto interrumpirá la conectividad)
+        HANG_AFTER_RESTART=$(check_hardware_hang)
+        if [ -n "$HANG_AFTER_RESTART" ]; then
+            log_message "Hardware Unit Hang persiste después de reiniciar la interfaz. Recargando módulo..."
+            reload_module
+        fi
+    fi
+
+    # Verificar conectividad con el gateway (con reintentos)
+    PING_SUCCESS=false
+    for ((i=1; i<=PING_RETRIES; i++)); do
+        PING_RESULT=$(ping -c 1 "$GATEWAY" | grep "1 received")
+        if [ -n "$PING_RESULT" ]; then
+            PING_SUCCESS=true
+            break
+        fi
+        log_message "Intento $i de ping a $GATEWAY fallido."
+        sleep 1
+    done
+
+    if [ "$PING_SUCCESS" = false ]; then
+        log_message "No se pudo alcanzar el gateway $GATEWAY después de $PING_RETRIES intentos."
+        restart_interface
+        # Verificar nuevamente después de reiniciar la interfaz
+        PING_RESULT=$(ping -c 1 "$GATEWAY" | grep "1 received")
+        if [ -z "$PING_RESULT" ]; then
+            log_message "Conectividad no restaurada después de reiniciar la interfaz. Recargando módulo..."
+            reload_module
+        fi
+    fi
+
+    sleep "$SLEEP_INTERVAL"
+done
