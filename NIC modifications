@@ -1,0 +1,29 @@
+Pasos recomendados
+1. Aplica los cambios sugeridos para mitigar los bloqueos
+Estos cambios son los más probables para resolver el problema sin necesidad de un script de monitoreo:
+Desactiva TSO y GSO:
+
+ethtool -K eno1 tso off gso off
+
+Hazlo permanente:
+
+echo "ethtool -K eno1 tso off gso off" >> /etc/rc.local
+chmod +x /etc/rc.local
+
+Desactiva EEE:
+
+ethtool --set-eee eno1 eee off
+
+Hazlo permanente:
+
+echo "ethtool --set-eee eno1 eee off" >> /etc/rc.local
+
+Ajusta el tamaño del anillo de transmisión:
+
+ethtool -G eno1 tx 512
+
+Desactiva InterruptThrottleRate:
+
+echo "options e1000e InterruptThrottleRate=0" >> /etc/modprobe.d/e1000e.conf
+reboot
+
